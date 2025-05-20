@@ -10,8 +10,8 @@ from utils import get_recipe_embeddings, filter_recipes
 app = FastAPI()
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
-pinecone.init(api_key=os.getenv("PINECONE_API_KEY"), environment=os.getenv("PINECONE_ENV"))
-pinecone_index = pinecone.Index(os.getenv("PINECONE_INDEX"))
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+index = pinecone.Index(os.getenv("PINECONE_INDEX"))
 
 class RecipeQuery(BaseModel):
     ingredients: List[str]
