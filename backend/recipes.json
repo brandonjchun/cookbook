@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Tomato Basil Pasta",
+    "ingredients": [
+      "pasta",
+      "tomato",
+      "basil",
+      "garlic",
+      "olive oil",
+      "salt",
+      "pepper",
+      "eggs"
+    ],
+    "instructions": "Boil pasta until al dente. In a pan, sauté garlic in olive oil, add chopped tomatoes, cook for 5 minutes. Toss in cooked pasta and chopped basil. Season with salt and pepper. Serve warm."
+  },
+  {
+    "name": "Simple Omelette",
+    "ingredients": [
+      "eggs",
+      "milk",
+      "butter",
+      "salt",
+      "pepper"
+    ],
+    "instructions": "Whisk eggs with milk, salt, and pepper. Melt butter in a pan over medium heat, pour in egg mixture, cook until set. Fold and serve."
+  },
+  {
+    "name": "Avocado Toast",
+    "ingredients": [
+      "bread",
+      "avocado",
+      "lemon juice",
+      "salt",
+      "pepper"
+    ],
+    "instructions": "Toast the bread. Mash avocado with lemon juice, salt, and pepper. Spread avocado mix on toast. Enjoy."
+  }
+]

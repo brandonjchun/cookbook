@@ -1,43 +1,78 @@
-from dotenv import load_dotenv
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List
-import openai
-import pinecone
-import os
-from utils import get_recipe_embeddings, filter_recipes
+import json
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
+# Load recipes
+with open("recipes.json", "r") as f:
+    RECIPES = json.load(f)
+
+# Load embedding model (free, local)
+MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+
+# Precompute embeddings for all recipes
+def compute_recipe_embedding(recipe):
+    text = ", ".join(recipe["ingredients"]) + ". " + recipe["instructions"]
+    return MODEL.encode(text)
+
+RECIPE_EMBEDDINGS = np.vstack([compute_recipe_embedding(r) for r in RECIPES])
+
+# FastAPI setup
 app = FastAPI()
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
-pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-index = pinecone.Index(os.getenv("PINECONE_INDEX"))
+# Allow CORS for React frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-class RecipeQuery(BaseModel):
-    ingredients: List[str]
-    filter_type: str  # "strict", "flexible", "loose"
+class QueryRequest(BaseModel):
+    ingredients: list[str]
+    filter_type: str  # "strict", "flexible", or "loose"
     allowed_extras: int = 0
 
 @app.post("/recommend")
-async def recommend_recipes(query: RecipeQuery):
-    ingredient_query = ", ".join(query.ingredients)
-    embedding = openai.embeddings.create(
-        input=ingredient_query,
-        model="text-embedding-ada-002"
-    )["data"][0]["embedding"]
+def recommend(request: QueryRequest):
+    # Build user input string and embed
+    user_ingredients = [ing.strip() for ing in request.ingredients]
+    input_text = ", ".join(user_ingredients)
+    user_embedding = MODEL.encode(input_text)
 
-    result = pinecone_index.query(
-        vector=embedding,
-        top_k=30,
-        include_metadata=True
-    )
-    recipes = [match['metadata'] for match in result['matches']]
-
-    filtered = filter_recipes(
-        recipes, 
-        query.ingredients, 
-        query.filter_type, 
-        query.allowed_extras
+    # Compute cosine similarity to all recipes
+    sims = RECIPE_EMBEDDINGS @ user_embedding / (
+        np.linalg.norm(RECIPE_EMBEDDINGS, axis=1) * np.linalg.norm(user_embedding) + 1e-10
     )
 
-    return {"results": filtered}
+    # Filter based on chosen strategy
+    results = []
+    for i, recipe in enumerate(RECIPES):
+        recipe_ingredients = [ing.lower() for ing in recipe["ingredients"]]
+        # --- Strict: all and only user ingredients (allow only spices as extras)
+        if request.filter_type == "strict":
+            extra_ings = [ing for ing in recipe_ingredients if ing not in [i.lower() for i in user_ingredients]]
+            allowed_spices = ["salt", "pepper", "oil", "sugar", "water", "vinegar", "spice", "herbs"]
+            non_spice_extras = [e for e in extra_ings if e not in allowed_spices]
+            if non_spice_extras:
+                continue
+            if set(recipe_ingredients) != set([i.lower() for i in user_ingredients] + [e for e in extra_ings if e in allowed_spices]):
+                continue
+        # --- Flexible: allow some extra ingredients
+        elif request.filter_type == "flexible":
+            extra_ings = [ing for ing in recipe_ingredients if ing not in [i.lower() for i in user_ingredients]]
+            if len(extra_ings) > request.allowed_extras:
+                continue
+        # --- Loose: only requires all user ingredients be present
+        elif request.filter_type == "loose":
+            if not all(i.lower() in recipe_ingredients for i in user_ingredients):
+                continue
+        # Add to results, store similarity for ranking
+        results.append({"similarity": float(sims[i]), **recipe})
+
+    # Return sorted by similarity (highest first)
+    results = sorted(results, key=lambda x: -x["similarity"])[:10]  # Top 10
+    return {"results": results}
