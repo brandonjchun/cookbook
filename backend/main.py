@@ -25,7 +25,7 @@ app = FastAPI()
 # Allow CORS for React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,7 +55,29 @@ def recommend(request: QueryRequest):
         # --- Strict: all and only user ingredients (allow only spices as extras)
         if request.filter_type == "strict":
             extra_ings = [ing for ing in recipe_ingredients if ing not in [i.lower() for i in user_ingredients]]
-            allowed_spices = ["salt", "pepper", "oil", "sugar", "water", "vinegar", "spice", "herbs"]
+            allowed_spices = ["salt", 
+                              "pepper", 
+                              "oil", 
+                              "sugar", 
+                              "water", 
+                              "vinegar", 
+                              "spice", 
+                              "herbs", 
+                              "butter",
+                              "cumin",
+                              "flour",
+                              "rice",
+                              "pasta",
+                              "panko",
+                              "garlic powder",
+                              "onion powder",
+                              "oregano",
+                              "thyme",
+                              "basil",
+                              "paprika",
+                              "chili flakes"
+                              "cayenne pepper",
+                              "soy sauce"]
             non_spice_extras = [e for e in extra_ings if e not in allowed_spices]
             if non_spice_extras:
                 continue

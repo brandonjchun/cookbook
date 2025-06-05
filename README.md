@@ -14,3 +14,6 @@ npm start
 start venv
 
 source venv/bin/activate
+
+# on powershell
+venv\Scripts\Activate.ps1

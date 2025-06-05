@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 function App() {
   const [ingredients, setIngredients] = useState("");
@@ -7,19 +7,30 @@ function App() {
   const [allowedExtras, setAllowedExtras] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const debounceRef = useRef();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // Live search: runs when ingredients, filterType, or allowedExtras change
+  useEffect(() => {
+    // Do not search if input is empty
+    if (ingredients.trim() === "") {
+      setRecipes([]);
+      setError("");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError("");
     setRecipes([]);
-    const ingredientList = ingredients
-      .split(",")
-      .map((i) => i.trim())
-      .filter(Boolean);
+    // Debounce to avoid spamming backend while typing
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const ingredientList = ingredients
+        .split(/,|\s+/) // allow both comma and space separated!
+        .map((i) => i.trim())
+        .filter(Boolean);
 
-    try {
-      const response = await fetch("http://localhost:8000/recommend", {
+      fetch("http://localhost:8000/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -27,24 +38,26 @@ function App() {
           filter_type: filterType,
           allowed_extras: allowedExtras,
         }),
-      });
-      if (!response.ok) {
-        throw new Error("Backend error: " + response.status);
-      }
-      const data = await response.json();
-      setRecipes(data.results || []);
-    } catch (err) {
-      setError(err.message || "Network error");
-    }
-    setLoading(false);
-  };
+      })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("Backend error: " + response.status);
+          }
+          return response.json();
+        })
+        .then((data) => setRecipes(data.results || []))
+        .catch((err) => setError(err.message || "Network error"))
+        .finally(() => setLoading(false));
+    }, 400); // 400ms debounce
+
+    return () => clearTimeout(debounceRef.current);
+  }, [ingredients, filterType, allowedExtras]);
 
   return (
     <div
       style={{
         minHeight: "100vh",
-        background:
-          "linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%)",
+        background: "linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%)",
         padding: "2em",
         fontFamily: "'Segoe UI', Arial, sans-serif",
       }}
@@ -62,9 +75,12 @@ function App() {
         <h1 style={{ textAlign: "center", color: "#4f46e5" }}>
           🍳 Recipe Recommender
         </h1>
-        <form onSubmit={handleSubmit} style={{ marginBottom: "2em" }}>
+        <form
+          style={{ marginBottom: "2em" }}
+          onSubmit={e => e.preventDefault()}
+        >
           <label style={{ fontWeight: "bold" }}>
-            Ingredients (comma-separated):
+            Ingredients (comma or space separated):
             <input
               type="text"
               value={ingredients}
@@ -77,7 +93,7 @@ function App() {
                 borderRadius: "8px",
                 border: "1px solid #c7d2fe",
               }}
-              placeholder="e.g. eggs, milk, bread"
+              placeholder="e.g. eggs milk bread"
               autoFocus
               required
             />
@@ -85,26 +101,32 @@ function App() {
           <div style={{ marginBottom: "1em" }}>
             <label style={{ fontWeight: "bold" }}>
               Filter type:
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                style={{
-                  marginLeft: "1em",
-                  padding: "0.4em",
-                  borderRadius: "8px",
-                  border: "1px solid #c7d2fe",
-                }}
-              >
-                <option value="strict">
-                  Strict (only inputted ingredients)
-                </option>
-                <option value="flexible">
-                  Flexible (allow extras)
-                </option>
-                <option value="loose">
-                  Loose (input ingredients included)
-                </option>
-              </select>
+              <div style={{ display: "flex", gap: 16, marginTop: "0.6em" }}>
+                {["strict", "flexible", "loose"].map((ftype) => (
+                  <button
+                    key={ftype}
+                    type="button"
+                    style={{
+                      background:
+                        filterType === ftype
+                          ? "linear-gradient(90deg,#6366f1 0%,#818cf8 100%)"
+                          : "#f1f5f9",
+                      color: filterType === ftype ? "#fff" : "#4f46e5",
+                      border: filterType === ftype
+                        ? "none"
+                        : "1px solid #c7d2fe",
+                      borderRadius: "8px",
+                      padding: "0.5em 1.5em",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      transition: "background 0.2s",
+                    }}
+                    onClick={() => setFilterType(ftype)}
+                  >
+                    {ftype.charAt(0).toUpperCase() + ftype.slice(1)}
+                  </button>
+                ))}
+              </div>
             </label>
             {filterType === "flexible" && (
               <label style={{ marginLeft: "2em", fontWeight: "bold" }}>
@@ -126,25 +148,6 @@ function App() {
               </label>
             )}
           </div>
-          <button
-            type="submit"
-            style={{
-              background:
-                "linear-gradient(90deg,#6366f1 0%,#818cf8 100%)",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              padding: "0.7em 2em",
-              fontWeight: "bold",
-              fontSize: "1em",
-              cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(99,102,241,0.07)",
-              transition: "background 0.2s",
-            }}
-            disabled={loading}
-          >
-            {loading ? "Searching..." : "Find Recipes"}
-          </button>
         </form>
         {error && (
           <div
