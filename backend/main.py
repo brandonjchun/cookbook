@@ -98,3 +98,25 @@ def recommend(request: QueryRequest):
     # Return sorted by similarity (highest first)
     results = sorted(results, key=lambda x: -x["similarity"])[:10]  # Top 10
     return {"results": results}
+
+@app.get("/all_recipes")
+def get_all_recipes():
+    """
+    Returns all recipes as a list.
+    For frontend display, flattens ingredients to a list of names (not objects).
+    """
+    # Check if ingredients are objects (for new-style recipes.json), otherwise just pass as-is
+    def flatten_ings(ings):
+        # If list of dicts, return item field, else return string
+        if len(ings) > 0 and isinstance(ings[0], dict):
+            return [i["item"] for i in ings]
+        return ings
+
+    results = []
+    for recipe in RECIPES:
+        results.append({
+            "name": recipe["name"],
+            "ingredients": flatten_ings(recipe["ingredients"]),
+            "instructions": recipe.get("instructions", "")
+        })
+    return {"results": results}
