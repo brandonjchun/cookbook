@@ -36,3 +36,7 @@ node_modules/
 package-lock.json
 node_modules
 backend/venv/
+backend/.env/
+backend/.env
+/backend/.env/
+/backend/.env

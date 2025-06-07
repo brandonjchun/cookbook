@@ -4,7 +4,12 @@ from pydantic import BaseModel
 import json
 import numpy as np
 from sentence_transformers import SentenceTransformer
+import requests
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
+print("Loaded HF_TOKEN:", os.getenv("HF_TOKEN"))
 # Load recipes
 with open("recipes.json", "r") as f:
     RECIPES = json.load(f)
@@ -36,6 +41,34 @@ class QueryRequest(BaseModel):
     filter_type: str  # "strict", "flexible", or "loose"
     allowed_extras: int = 0
 
+class AIRecipeRequest(BaseModel):
+    ingredients: list[str]
+
+@app.post("/ai_recipe")
+def ai_recipe(request: AIRecipeRequest):
+    HF_TOKEN = os.getenv("HF_TOKEN")
+    API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
+    prompt = (
+        f"Invent a unique, creative recipe using ONLY these ingredients: {', '.join(request.ingredients)}.\n"
+        "Format:\nName: ...\nIngredients: ...\nInstructions: ...\n"
+        "Give realistic ingredient amounts and clear, numbered instructions."
+    )
+
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    resp = requests.post(API_URL, headers=headers, json={"inputs": prompt})
+    try:
+        result = resp.json()
+    except Exception:
+        return {"error": "Invalid response from Hugging Face."}
+
+    # Typical format: [{'generated_text': "..."}]
+    if isinstance(result, list) and result and "generated_text" in result[0]:
+        return {"recipe": result[0]["generated_text"]}
+    elif isinstance(result, dict) and "error" in result:
+        return {"error": result["error"]}
+    else:
+        return {"error": "Unexpected response from Hugging Face."}
+    
 @app.post("/recommend")
 def recommend(request: QueryRequest):
     # Build user input string and embed
