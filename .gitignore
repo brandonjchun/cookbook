@@ -36,7 +36,11 @@ node_modules/
 package-lock.json
 node_modules
 backend/venv/
+<<<<<<< HEAD
 backend/.env/
 backend/.env
 /backend/.env/
 /backend/.env
+=======
+backend/.env/
+>>>>>>> d8ed128ae025774d57119f5c0e54feaeb97d1b78
